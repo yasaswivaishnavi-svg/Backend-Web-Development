@@ -1,4 +1,4 @@
-'use strict';
+/*'use strict';
 // auth/passport.js — Google OAuth strategy
 //
 // YOUR TASK: implement verifyCallback below.
@@ -61,4 +61,73 @@ passport.use(
 );
 
 // verifyCallback is exported so tests can call it directly without a real browser.
+module.exports = { passport, verifyCallback };
+*/
+
+
+'use strict';
+
+const passport = require('passport');
+const { Strategy: GoogleStrategy } = require('passport-google-oauth20');
+const { users, nextId } = require('../data');
+
+async function verifyCallback(accessToken, refreshToken, profile, done) {
+  try {
+    const googleId = profile.id;
+    const email = profile.emails[0].value;
+    const name = profile.displayName;
+
+    // 1. Returning Google user
+    const existingGoogleUser = users.find(
+      (user) => user.googleId === googleId
+    );
+
+    if (existingGoogleUser) {
+      return done(null, existingGoogleUser);
+    }
+
+    // 2. Existing local account
+    const existingEmailUser = users.find(
+      (user) => user.email === email
+    );
+
+    if (existingEmailUser) {
+      if (profile._json.email_verified === true) {
+        existingEmailUser.googleId = googleId;
+        return done(null, existingEmailUser);
+      }
+
+      return done(null, false);
+    }
+
+    // 3. New user
+    const newUser = {
+      id: nextId(),
+      googleId: googleId,
+      email: email,
+      name: name,
+      role: 'member'
+    };
+
+    users.push(newUser);
+
+    return done(null, newUser);
+
+  } catch (err) {
+    return done(err);
+  }
+}
+
+// Google OAuth Strategy
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID || 'test-client-id',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'test-client-secret',
+      callbackURL: '/auth/google/callback',
+    },
+    verifyCallback,
+  ),
+);
+
 module.exports = { passport, verifyCallback };
