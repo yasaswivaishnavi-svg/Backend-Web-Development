@@ -1,4 +1,4 @@
-'use strict';
+/*'use strict';
 // middleware/rateLimiter.js
 //
 // YOUR TASK: replace this pass-through with a real rate limiter.
@@ -23,4 +23,48 @@
 //   const rateLimit = require('express-rate-limit');
 //   module.exports = rateLimit({ ...options });
 
-module.exports = (req, res, next) => next(); // TODO: replace this stub
+module.exports = (req, res, next) => next(); // TODO: replace this stub*/
+
+
+'use strict';
+
+// Import express-rate-limit package
+const rateLimit = require('express-rate-limit');
+
+// Create a shared rate limiter for authentication routes
+const authLimiter = rateLimit({
+  // Time window: 15 minutes
+  windowMs: 15 * 60 * 1000,
+
+  // Allow maximum 5 failed attempts per IP
+  max: 5,
+
+  // Send modern RateLimit headers
+  standardHeaders: true,
+
+  // Disable older X-RateLimit headers
+  legacyHeaders: false,
+
+  // Count only failed requests
+  skipSuccessfulRequests: true,
+
+  // Return 429 when the limit is exceeded
+  handler: (req, res) => {
+    res.set('Retry-After', String(
+      Math.max(1, Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000))
+    ));
+
+    res.status(429).json({
+      message: 'Too many requests. Please try again later.'
+    });
+  }
+});
+
+// Redis store can replace the default in-memory store using rate-limit-redis
+// and a shared Redis connection. In a multi-instance deployment behind a
+// load balancer, each server has its own memory, so request counts are separate.
+// Redis provides one shared counter across all instances, ensuring consistent
+// rate limiting regardless of which server handles the request.
+
+module.exports = authLimiter;
+
